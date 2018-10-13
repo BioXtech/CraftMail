@@ -1,3 +1,8 @@
+if peripheral.getType("top") ~= "modem" then
+  printError("Pas de modem detecté au dessus")
+elseif term.isColor() ~= true then
+  printError("Ce n'est pas un Advanced Computer")
+else
 rednet.open("top")
 term.clear()
 contacts = {}
@@ -57,7 +62,7 @@ end
 function menu()
 	term.clear()
 	term.setCursorPos(1,1)
-	print("CraftMail by BioXtech v1.0")
+	print("CraftMail by BioXtech v2.0")
 	print("[N] pour envoyer un message")
 	print("[M] pour voir les messages")
 	print("[C] pour ouvrir le carnet d'adresses")
