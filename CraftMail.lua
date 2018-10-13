@@ -1,63 +1,79 @@
-if peripheral.getType("top") ~= "modem" then
-	  printError("Pas de modem detecté au dessus")
-elseif term.isColor() ~= true then
+if not peripheral.find("modem") then
+	  printError("Pas de modem detecte")
+elseif not term.isColor() then
 	  printError("Ce n'est pas un Advanced Computer")
 else
-	local notif = 0
-	local quit = false
-	debut=true
-    redmess = {}
-	contacts = {}
-    passe = false
-    
-	if not passe then
-		shell.run("saveContact")
-	end
-	for i=1,table.getn(saveContacts) do
-		contacts[i] = saveContacts[i]
-	end
-	rednet.open("top")
-	term.clear()
-	term.setBackgroundColor(colors.blue)
 	
+    -- declaration var
+    local version = "4.0"
+    local notif = 0
+	local quit = false
+    redmess = {}
+	name = "contacts"
+    --load contact
+    local file = fs.open(name,"r")
+    local data = file.readAll()
+    file.close()
+    contacts = textutils.unserialize(data)
+    if contacts == nil then
+        contacts = {}
+    end
+    rednet.open("top")
+	
+    function writeMid(text,y)
+       local strLength = string.len(text)
+       local xLength,yLength = term.getSize()
+       local start = math.floor(xLength/2)-math.floor(strLength/2)
+        term.setCursorPos(start,y)
+        term.write(text)
+    end
+    
+    function box()
+        xLength,yLength = term.getSize()
+        paintutils.drawBox(1,1,xLength,yLength,colors.black)
+    end
+        
+    
     --Ecran init
+    term.clear()
+	term.setBackgroundColor(colors.blue)
 	for i = 1,2 do
 	  term.setCursorPos(15,9)
 	  term.clear()
-	  write("Initialisation. ")
+	  write("Initialisation.")
 	  sleep(1)
-	  write(". ")
+	  write(".")
 	  sleep(1)
-	  write(". ")
+	  write(".")
 	  sleep(1)
 	end
-
 	term.clear()
-	term.setCursorPos(15,12)
-	write("Bienvenue !")
+	writeMid("Bienvenue !",9)
 	sleep(1)
 	term.clear()
 
 	--Menu
     function menu()
 		term.clear()
-		term.setCursorPos(1,1)
-		print("CraftMail by BioXtech v3.0")
-		print("[N] pour envoyer un message")
-		print("[M] pour voir les messages")
-		print("[C] pour ouvrir le carnet d'adresses")
-		print("[Q] pour quitter")
-		print("ID Computer: "..os.getComputerID())
+        box()
+		writeMid("CraftMail by BioXtech v"..version,2)
+        term.setBackgroundColor(colors.blue)
+		writeMid(" [N]ouveau message",3)
+		writeMid(" [R]eception messages",5)
+		writeMid(" [C]arnet d'adresses",7)
+		writeMid(" [Q]uitter",9)
+        term.setCursorPos(2,10)
+		print(" ID Computer: "..os.getComputerID())
 		while quit ~= true do
 			local event, char, message = os.pullEvent()
 			if event == "rednet_message" then
 				notif = notif + 1
 				table.insert(redmess,message)
-				term.setCursorPos(30,3)
+				term.setCursorPos(40,5)
 				print("("..notif..")")
 			elseif char == "n" then
 				messageEnvoi()
-			elseif char == "m" then
+			elseif char == "r" then
 				messageRecep()
 			elseif char == "c" then
 				adresses()
@@ -68,7 +84,8 @@ else
 		end
 	end
 
-	function adresses()
+	--Carnet adresses
+    function adresses()
 		term.clear()
 		term.setCursorPos(16,2)
 		print("Carnet d'adresses")
@@ -76,9 +93,6 @@ else
 		print("[N] pour nouvelle adresse")
 		print("[Q] pour revenir au menu")
 		print(" ")
-		for i=1,table.getn(saveContacts) do
-			contacts[i] = saveContacts[i]
-		end
 		for key, value in pairs(contacts) do
 			print(value)
 		end
@@ -89,7 +103,8 @@ else
 			menu()
 		end
 	end
-
+    
+    --Add contact
 	function contact()
 		print("Mettre le nom de la personne plus l'id de son computer")
 		local new = read()
@@ -100,7 +115,8 @@ else
 		term.clear()
 		adresses()
 	end
-
+    
+    --Send message
 	function messageEnvoi()
 		term.clear()
 		term.setCursorPos(1,2)
@@ -114,7 +130,8 @@ else
 		term.clear()
 		menu()
 	end
-
+    
+    --reception message
 	function messageRecep()
 		term.clear()
 		term.setCursorPos(14,1)
@@ -138,7 +155,8 @@ else
 			end
 		end
 	end
-
+    
+    --quitter
 	function quitter()
 		term.clear()
 		term.setCursorPos(14,9)
@@ -147,8 +165,9 @@ else
 		term.setBackgroundColor(colors.black)
 		term.clear()
 		term.setCursorPos(1,1)
-		debut = false
-		shell.run("saveContact")
+        local file = fs.open(name,"w")
+        file.write(textutils.serialize(contacts))
+        file.close()
 	end
 	menu()
 end
