@@ -1,117 +1,132 @@
-if not peripheral.find("modem") then
-	  printError("Pas de modem detecte")
-elseif not term.isColor() then
-	  printError("Ce n'est pas un Advanced Computer")
-else
-	
+component = require("component")
+term = require("term")
+gpu = require("component").gpu
+modem = require("component").modem
+colors =require("colors")
+event = require("event")
+serialization = require("serialization")
+
+if not component.isAvailable("modem") then
+	  io.stderr("Pas de carte sans fil detecte")
+elseif gpu.getDepth() == 1 then
+	  io.stderr("Il faut une carte graphqie de Tier 2 min")
+end
     -- declaration var
     local version = "4.0"
     local notif = 0
-	local quit = false
+    local quit = false
     redmess = {}
-	name = "contacts"
-    --load contact
-    local file = fs.open(name,"r")
-    local data = file.readAll()
-    file.close()
-    contacts = textutils.unserialize(data)
-    if contacts == nil then
-        contacts = {}
+    name = "contacts"
+    --getServerAddress
+    modem.open(32728)
+    modem.broadcast(32728,"getServerAddress")
+    eventName = nil
+    local eventName,_,remoteAddress,_,_,protocol = event.pull("modem_message")
+    if protocol == "getServerAddress" then
+      serverAddress = remoteAddress
     end
-    rednet.open("top")
-	
+    
+    --load contact
+    local file = io.open(name)
+    local data = file:read("*a")
+    file:close()
+    contacts = serialization.unserialize(data)
+    if contacts == nil then
+      contacts = {}
+    end
+
     function writeMid(text,y)
        local strLength = string.len(text)
-       local xLength,yLength = term.getSize()
+       local xLength,yLength = term.getViewport()
        local start = math.floor(xLength/2)-math.floor(strLength/2)
-        term.setCursorPos(start,y)
-        term.write(text)
+       term.setCursor(start,y)
+       term.write(text)
     end
     
     function box()
-        xLength,yLength = term.getSize()
-        paintutils.drawBox(1,1,xLength,yLength,colors.black)
+        xLength,yLength = term.getViewport()
+       -- paintutils.drawBox(1,1,xLength,yLength,colors.black)
     end
-        
     
-    --Ecran init
-    term.clear()
-	term.setBackgroundColor(colors.blue)
-	for i = 1,2 do
-	  term.setCursorPos(15,9)
+  --Ecran init
+  term.clear()
+	gpu.setBackground(0x0000FF)
+	--[[for i = 1,2 do
+	  term.setCursor(15,9)
 	  term.clear()
-	  write("Initialisation.")
-	  sleep(1)
-	  write(".")
-	  sleep(1)
-	  write(".")
-	  sleep(1)
-	end
+	  io.write("Initialisation.")
+	  os.sleep(1)
+	  io.write(".")
+	  os.sleep(1)
+	  io.write(".")
+	  os.sleep(1)
+	end]]
 	term.clear()
 	writeMid("Bienvenue !",9)
-	sleep(1)
+	os.sleep(1)
 	term.clear()
 
 	--Menu
-    function menu()
+  function menu()
 		term.clear()
-        box()
+    box()
 		writeMid("CraftMail by BioXtech v"..version,2)
-        term.setBackgroundColor(colors.blue)
+    gpu.setBackground(0x0000FF)
 		writeMid(" [N]ouveau message",3)
 		writeMid(" [R]eception messages",5)
 		writeMid(" [C]arnet d'adresses",7)
 		writeMid(" [Q]uitter",9)
-        term.setCursorPos(2,10)
-		print(" ID Computer: "..os.getComputerID())
-		while quit ~= true do
-			local event, char, message = os.pullEvent()
-			if event == "rednet_message" then
+		eventName = nil
+  arg2 = nil
+  os.sleep(2)
+    while true do    
+    local eventName, arg1, arg2, _, _, message = event.pull()
+			if eventName == "modem_message" then
 				notif = notif + 1
 				table.insert(redmess,message)
-				term.setCursorPos(40,5)
+				term.setCursor(40,5)
 				print("("..notif..")")
-			elseif char == "n" then
+			elseif arg2 == 110 then
 				messageEnvoi()
-			elseif char == "r" then
+			elseif arg2 == 114 then
 				messageRecep()
-			elseif char == "c" then
+			elseif arg2 == 99 then
 				adresses()
-			elseif char == "q" then
-				quit = true
+			elseif arg2 == 113 then
 				quitter()
-			end	
+			end
 		end
 	end
 
 	--Carnet adresses
-    function adresses()
+  function adresses()
 		term.clear()
-		term.setCursorPos(16,2)
+		term.setCursor(16,2)
 		print("Carnet d'adresses")
-		term.setCursorPos(1,3)
+		term.setCursor(1,3)
 		print("[N] pour nouvelle adresse")
 		print("[Q] pour revenir au menu")
 		print(" ")
 		for key, value in pairs(contacts) do
 			print(value)
 		end
-		local event2, char2 = os.pullEvent("char")
-		if char2 == "n" then
+		eventName = nil
+    local eventName, _, arg2 = event.pull("key_down")
+		if arg2 == 110 then
 			contact()
-		elseif char2 == "q" then
+		elseif arg2 == 113 then
 			menu()
 		end
 	end
     
     --Add contact
 	function contact()
-		print("Mettre le nom de la personne plus l'id de son computer")
-		local new = read()
+		print("Mettre le nom de la personne")
+		local new = io.read()
 		table.insert(contacts,new)
-		term.setCursorPos(14,9)
+		term.setCursor(14,9)
 		print("Contact ajoute !")
-		sleep(1)
+		os.sleep(1)
 		term.clear()
 		adresses()
 	end
@@ -119,14 +134,14 @@ else
     --Send message
 	function messageEnvoi()
 		term.clear()
-		term.setCursorPos(1,2)
+		term.setCursor(1,2)
 		print("A qui voulez vous envoyer un message ?")
-		local personne = tonumber(read())
+		local personne = io.read()
 		print("Quel est le message ?")
-		local messageEnvoi = read()
-		rednet.send(personne,messageEnvoi)
+		local messageEnvoi = io.read()
+		modem.send(serverAddress,32728,protocol,messageEnvoi)
 		print("Ok,message envoye !")
-		sleep(1)
+		os.sleep(1)
 		term.clear()
 		menu()
 	end
@@ -134,24 +149,23 @@ else
     --reception message
 	function messageRecep()
 		term.clear()
-		term.setCursorPos(14,1)
-		write("Messages")
-		term.setCursorPos(1,2)
+		term.setCursor(14,1)
+		io.write("Messages")
+		term.setCursor(1,2)
 		print("[Q] pour revenir au menu")
 		print(" ")
-		print("Messages :")
+    print("Messages :")
+    eventName = nil
 		for key, value in pairs(redmess) do
 			print(value)
 		end
-		while char3 ~= "q" do
-			local event3, char3, arg3 = os.pullEvent()
-			if event3 == "char" then  
-				if char3 == "q" then
+    while arg3 ~= 113 do
+      local eventName, _, arg2, _, _, data = event.pull()
+			if eventName == "key_down" and arg2 == 113 then
 					menu()
-				end
-			elseif event3 == "rednet_message" then
-				table.insert(redmess,arg3)
-				print(arg3)
+			elseif eventName == "modem_message" then
+				table.insert(redmess,data)
+				print(data)
 			end
 		end
 	end
@@ -159,15 +173,15 @@ else
     --quitter
 	function quitter()
 		term.clear()
-		term.setCursorPos(14,9)
-		write("Au revoir")
-		sleep(1)
-		term.setBackgroundColor(colors.black)
+		term.setCursor(14,9)
+		io.write("Au revoir")
+		os.sleep(1)
+		gpu.setBackground(0x00)
 		term.clear()
-		term.setCursorPos(1,1)
-        local file = fs.open(name,"w")
-        file.write(textutils.serialize(contacts))
-        file.close()
+		term.setCursor(1,1)
+        local file = io.open(name,"w")
+        file:write(serialization.serialize(contacts))
+        file:close()
+os.exit()
 	end
 	menu()
-end
