@@ -23,4 +23,3 @@ The overall of the UI is not that good looking but I'm workin on it :smiley: .
 ## Server
 
 The server prints its network activity on the screen and do what a server needs to do.
-
