@@ -7,7 +7,6 @@ local event = require("event")
 local serialization = require("serialization")
 local dataCard = require("component").data
 
-
 if not component.isAvailable("modem") then
   io.stderr("Pas de carte sans fil detecte")
 elseif gpu.getDepth() == 1 then
@@ -18,49 +17,52 @@ end
 -- declaration var
 local version = "5.0"
 local redmess = {"Messages"}
+
+local xRes, yRes = gpu.getViewport()
+local listMailPart = {["xMin"] = 3, ["yMin"] = 9, ["xMax"] = 32, ["yMax"] = yRes - 3}
+local editMailPart = {["xMin"] = 36, ["yMin"] = 5, ["xMax"] = xRes - 3, ["yMax"] = yRes - 3}
+local yBlockStart = {9, 14, 19, 24, 29, 34, 39}
 --getServerAddress
 modem.open(32728)
-modem.broadcast(32728,"getServerAddress")
+modem.broadcast(32728, "getServerAddress")
 eventName = nil
-local eventName,_,remoteAddress,_,_,protocol = event.pull("modem_message")
+local eventName, _, remoteAddress, _, _, protocol = event.pull("modem_message")
 if protocol == "getServerAddress" then
   serverAddress = remoteAddress
 end
 
-function writeMid(text,y)
+function writeMid(text, y)
   local strLength = string.len(text)
-  local xLength,yLength = term.getViewport()
-  local start = math.floor(xLength/2)-math.floor(strLength/2)
-  term.setCursor(start,y)
+  local xLength, yLength = term.getViewport()
+  local start = math.floor(xLength / 2) - math.floor(strLength / 2)
+  term.setCursor(start, y)
   term.write(text)
 end
 
 function login()
   term.clear()
-  term.setCursor(4,2)
+  term.setCursor(4, 2)
   io.write("Login")
-  term.setCursor(4,4)
+  term.setCursor(4, 4)
   io.write("ID : ")
   id = io.read()
-  term.setCursor(4,8)
+  term.setCursor(4, 8)
   io.write("Password : ")
   password = io.read()
-  modem.send(serverAddress,32728,"userLogon",id,password)
-  eventName,a,b,c,d,protocol,isSucessfull = event.pull("modem_message")
+  modem.send(serverAddress, 32728, "userLogon", id, password)
+  eventName, a, b, c, d, protocol, isSucessfull = event.pull("modem_message")
   return isSucessfull
 end
-
-
 
 repeat
   isSucessfull = login()
   if isSucessfull then
     term.clear()
-    writeMid("Authentification reussie",8)
+    writeMid("Authentification reussie", 8)
     os.sleep(2)
   else
     term.clear()
-    writeMid("Authentification echouee",8)
+    writeMid("Authentification echouee", 8)
     os.sleep(2)
   end
 until isSucessfull
@@ -74,20 +76,63 @@ if contacts == nil then
   contacts = {}
 end
 
-
-
 function box()
-  xLength,yLength = term.getViewport()
-  gpu.fill(1,1,xLength,1," ")
-  gpu.fill(1,1,1,yLength," ")
-  gpu.fill(xLength,1,1,yLength," ")
-  gpu.fill(1,yLength,xLength,1," ")
+  xLength, yLength = term.getViewport()
+  gpu.fill(1, 1, xLength, 1, " ")
+  gpu.fill(1, 1, 1, yLength, " ")
+  gpu.fill(xLength, 1, 1, yLength, " ")
+  gpu.fill(1, yLength, xLength, 1, " ")
 end
 
+function initInterface()
+  gpu.setDepth(8)
+  term.clear()
+  --frame
+  gpu.setBackground(0xABABAB)
+  gpu.fill(1, 1, xRes, yRes, " ")
+  gpu.setBackground(0x000000)
+  gpu.fill(2, 2, xRes - 2, yRes - 2, " ")
+  gpu.setBackground(0xABABAB)
+  gpu.fill(1, 4, xRes, 1, " ")
+  --end frame
+
+  --top screen bar
+  gpu.setBackground(0x666666)
+  gpu.fill(1, 1, xRes, 3, " ")
+
+  gpu.setBackground(0xFF0000)
+  gpu.fill(xRes - 4, 1, 5, 3, " ")
+
+  gpu.setForeground(0x000000)
+  term.setCursor(xRes - 2, 2)
+  term.write("X")
+  --end top screen bar
+
+  --separator
+  gpu.setBackground(0xABABAB)
+  gpu.fill(34, 4, 1, yRes, " ")
+  --end separator
+end
+
+function drawBlock(x,y,sender,object)
+  term.setCursor(x,y)
+  gpu.setForeground(0x000000)
+  gpu.setBackground(0xFFFFFF)
+  gpu.fill(x,y,30,4," ")
+  term.setCursor(x+1,y+1)
+  term.write(sender.."\n")
+  term.setCursor(x+1,y+2)
+  if(string.len(object) >28) then
+    term.write(string.sub(object,1,25).."...")
+  else
+    term.write(object)
+  end
+end
 
 --Ecran init
 term.clear()
 gpu.setBackground(0x0000FF)
+ --
 --[[for i = 1,2 do
   term.setCursor(15,9)
   term.clear()
@@ -97,141 +142,140 @@ gpu.setBackground(0x0000FF)
   os.sleep(1)
   io.write(".")
   os.sleep(1)
-  end]]--
-  term.clear()
-  writeMid("Bienvenue !",9)
-  os.sleep(1)
-  term.clear()
+  end]] term.clear(
 
-  --Menu
-  function menu()
-    term.clear()
-    box()
-    writeMid("CraftMail by BioXtech v"..version,2)
-    gpu.setBackground(0x0000FF)
+)
+writeMid("Bienvenue !", 9)
+os.sleep(1)
+term.clear()
+
+--Menu
+function menu()
+  --writeMid("CraftMail by BioXtech v"..version,2)
+  --[[gpu.setBackground(0x0000FF)
     writeMid(" [N]ouveau message",3)
     writeMid(" [R]eception messages",5)
     writeMid(" [C]arnet d'adresses",7)
-    writeMid(" [Q]uitter",9)
-    eventName = nil
-    arg2 = nil
-    os.sleep(2)
-    arg2 = nil
-    repeat
-      local eventName, arg1, arg2, _, _, message = event.pull("key_down")
-      if arg2 == 110 then
-        messageEnvoi()
-      elseif arg2 == 114 then
-        messageRecep()
-      elseif arg2 == 99 then
-        adresses()
-      elseif arg2 == 113 then
-        quitter()
-      end
-    until (arg2 == 110 or arg2 == 114 or arg2 == 99 or arg2 == 113)
-  end
-
-  --Carnet adresses
-  function adresses()
-    term.clear()
-    term.setCursor(16,2)
-    print("Carnet d'adresses")
-    term.setCursor(1,3)
-    print("[N] pour nouvelle adresse")
-    print("[Q] pour revenir au menu")
-    print(" ")
-    for key, value in pairs(contacts) do
-      print(value)
+    writeMid(" [Q]uitter",9)--]]
+  eventName = nil
+  arg2 = nil
+  os.sleep(2)
+  arg2 = nil
+  repeat
+    local eventName, arg1, arg2, _, _, message = event.pull("key_down")
+    if arg2 == 110 then
+      messageEnvoi()
+    elseif arg2 == 114 then
+      messageRecep()
+    elseif arg2 == 99 then
+      adresses()
+    elseif arg2 == 113 then
+      quitter()
     end
-    eventName = nil
-    repeat
+  until (arg2 == 110 or arg2 == 114 or arg2 == 99 or arg2 == 113)
+end
+
+--Carnet adresses
+function adresses()
+  term.clear()
+  term.setCursor(16, 2)
+  print("Carnet d'adresses")
+  term.setCursor(1, 3)
+  print("[N] pour nouvelle adresse")
+  print("[Q] pour revenir au menu")
+  print(" ")
+  for key, value in pairs(contacts) do
+    print(value)
+  end
+  eventName = nil
+  repeat
     local eventName, _, arg2 = event.pull("key_down")
     if arg2 == 110 then
       contact()
     elseif arg2 == 113 then
       menu()
     end
-    until (arg2 == 100 or arg2 == 113)
-  end
+  until (arg2 == 100 or arg2 == 113)
+end
 
-  --Add contact
-  function contact()
-    print("Mettre le nom de la personne")
-    local new = io.read()
-    table.insert(contacts,new)
-    term.setCursor(14,9)
-    print("Contact ajoute !")
-    os.sleep(1)
-    term.clear()
-    adresses()
-  end
+--Add contact
+function contact()
+  print("Mettre le nom de la personne")
+  local new = io.read()
+  table.insert(contacts, new)
+  term.setCursor(14, 9)
+  print("Contact ajoute !")
+  os.sleep(1)
+  term.clear()
+  adresses()
+end
 
-  --Send message
-  function messageEnvoi()
-    term.clear()
-    term.setCursor(1,2)
-    print("A qui voulez vous envoyer un message ?")
-    local recipient = io.read()
-    print("Quel est le message ?")
-    local messageEnvoi = io.read()
-    modem.send(serverAddress,32728,"mailSendingService",recipient,messageEnvoi)
-    local event,_,_,_,_,protocol,isRecieved = event.pull("modem_message")
-    if protocol == "mailSendingService" and isRecieved == true then
-      print("Ok,message envoye !")
+--Send message
+function messageEnvoi()
+  term.clear()
+  term.setCursor(1, 2)
+  print("A qui voulez vous envoyer un message ?")
+  local recipient = io.read()
+  print("Quel est le message ?")
+  local messageEnvoi = io.read()
+  modem.send(serverAddress, 32728, "mailSendingService", recipient, messageEnvoi)
+  local event, _, _, _, _, protocol, isRecieved = event.pull("modem_message")
+  if protocol == "mailSendingService" and isRecieved == true then
+    print("Ok,message envoye !")
+  else
+    print("Le message n'a pas pu etre envoye")
+  end
+  os.sleep(1)
+  term.clear()
+  menu()
+end
+
+--reception message
+function messageRecep()
+  modem.send(serverAddress, 32728, "mailRequestService", id)
+  eventName = nil
+  eventName, _, _, _, _, protocol, data = event.pull("modem_message")
+  if protocol == "mailRequestService" then
+    redmess = serialization.unserialize(data)
+  end
+  term.clear()
+  term.setCursor(14, 1)
+  io.write("Messages")
+  term.setCursor(1, 2)
+  print("[Q] pour revenir au menu")
+  print(" ")
+  print("Messages :")
+  eventName = nil
+  for i = 1, 10 do
+    if redmess[i] == nil then
+      print("")
     else
-      print("Le message n'a pas pu etre envoye")
+      print(redmess[i])
     end
-    os.sleep(1)
-    term.clear()
-    menu()
   end
-
-  --reception message
-  function messageRecep()
-    modem.send(serverAddress, 32728, "mailRequestService",id)
-    eventName = nil
-    eventName, _, _, _, _, protocol, data = event.pull("modem_message")
-    if protocol == "mailRequestService" then
-      redmess = serialization.unserialize(data)
-    end
-    term.clear()
-    term.setCursor(14,1)
-    io.write("Messages")
-    term.setCursor(1,2)
-    print("[Q] pour revenir au menu")
-    print(" ")
-    print("Messages :")
-    eventName = nil
-    for i=1,10 do
-      if redmess[i] == nil then
-        print("")
-      else
-        print(redmess[i])
-      end
-    end
-    repeat
-      local eventName, _, arg2, _, _, data = event.pull()
-      if eventName == "key_down" and arg2 == 113 then
-        menu()
-      --[[elseif eventName == "modem_message" then
+  repeat
+    local eventName, _, arg2, _, _, data = event.pull()
+    if eventName == "key_down" and arg2 == 113 then
+      menu()
+    --[[elseif eventName == "modem_message" then
         table.insert(redmess,data)
         print(data)]]
-      end
-    until (arg2 == 113)
-  end
+    end
+  until (arg2 == 113)
+end
 
-  --quitter
-  function quitter()
-    term.clear()
-    term.setCursor(14,9)
-    io.write("Au revoir")
-    os.sleep(1)
-    gpu.setBackground(0x00)
-    term.clear()
-    term.setCursor(1,1)
-    local file = io.open("contacts","w")
-    file:write(serialization.serialize(contacts))
-    file:close()
-    os.exit()
-  end
-  menu()
+--quitter
+function quitter()
+  term.clear()
+  term.setCursor(14, 9)
+  io.write("Au revoir")
+  os.sleep(1)
+  gpu.setBackground(0x00)
+  term.clear()
+  term.setCursor(1, 1)
+  local file = io.open("contacts", "w")
+  file:write(serialization.serialize(contacts))
+  file:close()
+  os.exit()
+end
+menu()
