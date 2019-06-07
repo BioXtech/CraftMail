@@ -1,3 +1,4 @@
+--librairies
 local component = require("component")
 local term = require("term")
 local gpu = require("component").gpu
@@ -14,22 +15,14 @@ elseif gpu.getDepth() == 1 then
 elseif not component.isAvailable("data") then
   io.stderr("Pas de  Data Card presente")
 end
+
 -- declaration var
 local version = "5.0"
 local redmess = {"Messages"}
-
 local xRes, yRes = gpu.getViewport()
 local listMailPart = {["xMin"] = 3, ["yMin"] = 9, ["xMax"] = 32, ["yMax"] = yRes - 3}
 local editMailPart = {["xMin"] = 36, ["yMin"] = 5, ["xMax"] = xRes - 3, ["yMax"] = yRes - 3}
 local yBlockStart = {9, 14, 19, 24, 29, 34, 39}
---getServerAddress
-modem.open(32728)
-modem.broadcast(32728, "getServerAddress")
-eventName = nil
-local eventName, _, remoteAddress, _, _, protocol = event.pull("modem_message")
-if protocol == "getServerAddress" then
-  serverAddress = remoteAddress
-end
 
 function writeMid(text, y)
   local strLength = string.len(text)
@@ -37,43 +30,6 @@ function writeMid(text, y)
   local start = math.floor(xLength / 2) - math.floor(strLength / 2)
   term.setCursor(start, y)
   term.write(text)
-end
-
-function login()
-  term.clear()
-  term.setCursor(4, 2)
-  io.write("Login")
-  term.setCursor(4, 4)
-  io.write("ID : ")
-  id = io.read()
-  term.setCursor(4, 8)
-  io.write("Password : ")
-  password = io.read()
-  modem.send(serverAddress, 32728, "userLogon", id, password)
-  eventName, a, b, c, d, protocol, isSucessfull = event.pull("modem_message")
-  return isSucessfull
-end
-
-repeat
-  isSucessfull = login()
-  if isSucessfull then
-    term.clear()
-    writeMid("Authentification reussie", 8)
-    os.sleep(2)
-  else
-    term.clear()
-    writeMid("Authentification echouee", 8)
-    os.sleep(2)
-  end
-until isSucessfull
-
---load contact
-local file = io.open("contacts")
-local data = file:read("*a")
-file:close()
-contacts = serialization.unserialize(data)
-if contacts == nil then
-  contacts = {}
 end
 
 function box()
@@ -114,40 +70,52 @@ function initInterface()
   --end separator
 end
 
-function drawBlock(x,y,sender,object)
-  term.setCursor(x,y)
+function drawBlock(x, y, sender, object)
+  term.setCursor(x, y)
   gpu.setForeground(0x000000)
   gpu.setBackground(0xFFFFFF)
-  gpu.fill(x,y,30,4," ")
-  term.setCursor(x+1,y+1)
-  term.write(sender.."\n")
-  term.setCursor(x+1,y+2)
-  if(string.len(object) >28) then
-    term.write(string.sub(object,1,25).."...")
+  gpu.fill(x, y, 30, 4, " ")
+  term.setCursor(x + 1, y + 1)
+  term.write(sender .. "\n")
+  term.setCursor(x + 1, y + 2)
+  if (string.len(object) > 28) then
+    term.write(string.sub(object, 1, 25) .. "...")
   else
     term.write(object)
   end
 end
 
---Ecran init
-term.clear()
-gpu.setBackground(0x0000FF)
- --
---[[for i = 1,2 do
-  term.setCursor(15,9)
-  term.clear()
-  io.write("Initialisation.")
-  os.sleep(1)
-  io.write(".")
-  os.sleep(1)
-  io.write(".")
-  os.sleep(1)
-  end]] term.clear(
+function sendToServer(protocol,dataTable)
+  modem.send(serverAddress, 32728, protocol,serialization.serialize(dataTable))
+end
 
-)
-writeMid("Bienvenue !", 9)
-os.sleep(1)
-term.clear()
+function login()
+  term.clear()
+  term.setCursor(4, 2)
+  io.write("Login")
+  term.setCursor(4, 4)
+  io.write("ID : ")
+  accountId = io.read()
+  term.setCursor(4, 8)
+  io.write("Password : ")
+  password = io.read()
+  sendToServer("userLogon",{accountId = accountId, password = password})
+  eventName, a, b, c, d, protocol, isSucessfull = event.pull("modem_message")
+  return isSucessfull
+end
+
+function getMailFromServer()
+  sendToServer("mailRequestService",{accountId = accountId})
+  local try = 5
+  repeat
+    eventName, _, _, _, _, protocol, data = event.pull("modem_message") --localAddress,remoteAddress,port,distance
+    if protocol == "mailRequestService" then
+      message = serialization.unserialize(data)
+    end
+    try = try -1 
+  until redmess.getn() ~= 0 or try == 0
+  return message
+end
 
 --Menu
 function menu()
@@ -157,10 +125,11 @@ function menu()
     writeMid(" [R]eception messages",5)
     writeMid(" [C]arnet d'adresses",7)
     writeMid(" [Q]uitter",9)--]]
-  eventName = nil
-  arg2 = nil
-  os.sleep(2)
-  arg2 = nil
+  initInterface()
+  redmess = getMailFromServer()
+  for index,valeur in ipairs(redmess) do
+    drawBlock(listMailPart.xMin,yBlockStart[index],sender,object)
+  end
   repeat
     local eventName, arg1, arg2, _, _, message = event.pull("key_down")
     if arg2 == 110 then
@@ -218,7 +187,7 @@ function messageEnvoi()
   local recipient = io.read()
   print("Quel est le message ?")
   local messageEnvoi = io.read()
-  modem.send(serverAddress, 32728, "mailSendingService", recipient, messageEnvoi)
+  sendToServer("mailSendingService",{recipient = recipient,accountId = accountId,message = messageEnvoi})
   local event, _, _, _, _, protocol, isRecieved = event.pull("modem_message")
   if protocol == "mailSendingService" and isRecieved == true then
     print("Ok,message envoye !")
@@ -232,12 +201,7 @@ end
 
 --reception message
 function messageRecep()
-  modem.send(serverAddress, 32728, "mailRequestService", id)
-  eventName = nil
-  eventName, _, _, _, _, protocol, data = event.pull("modem_message")
-  if protocol == "mailRequestService" then
-    redmess = serialization.unserialize(data)
-  end
+  redmess = getMailFromServer()
   term.clear()
   term.setCursor(14, 1)
   io.write("Messages")
@@ -245,7 +209,6 @@ function messageRecep()
   print("[Q] pour revenir au menu")
   print(" ")
   print("Messages :")
-  eventName = nil
   for i = 1, 10 do
     if redmess[i] == nil then
       print("")
@@ -278,4 +241,40 @@ function quitter()
   file:close()
   os.exit()
 end
+
+--getServerAddress
+modem.open(32728)
+modem.broadcast(32728, "getServerAddress")
+local try = 10
+local eventName, _, remoteAddress, _, _, protocol = event.pull("modem_message")
+repeat
+  if protocol == "getServerAddress" then
+    serverAddress = remoteAddress
+  end
+  try = try - 1
+until serverAddress ~= nil or try == 0
+
+--login screen
+repeat
+  isSucessfull = login()
+  if isSucessfull then
+    term.clear()
+    writeMid("Authentification reussie", 8)
+    os.sleep(2)
+  else
+    term.clear()
+    writeMid("Authentification echouee", 8)
+    os.sleep(2)
+  end
+until isSucessfull
+
+--load contact
+local file = io.open("contacts")
+local data = file:read("*a")
+file:close()
+contacts = serialization.unserialize(data)
+if contacts == nil then
+  contacts = {}
+end
+
 menu()
