@@ -17,8 +17,10 @@ elseif not component.isAvailable("data") then
 end
 
 -- declaration var
-local version = "5.0"
-local redmess = {"Messages"}
+local version = "6.0"
+local accountId = ""
+local password = ""
+local redmess = {}
 local xRes, yRes = gpu.getViewport()
 local listMailPart = {["xMin"] = 3, ["yMin"] = 9, ["xMax"] = 32, ["yMax"] = yRes - 3}
 local editMailPart = {["xMin"] = 36, ["yMin"] = 5, ["xMax"] = xRes - 3, ["yMax"] = yRes - 3}
@@ -112,8 +114,8 @@ function getMailFromServer()
     if protocol == "mailRequestService" then
       message = serialization.unserialize(data)
     end
-    try = try -1 
-  until redmess.getn() ~= 0 or try == 0
+    try = try -1
+  until #message ~= 0 or try == 0
   return message
 end
 
@@ -127,8 +129,8 @@ function menu()
     writeMid(" [Q]uitter",9)--]]
   initInterface()
   redmess = getMailFromServer()
-  for index,valeur in ipairs(redmess) do
-    drawBlock(listMailPart.xMin,yBlockStart[index],sender,object)
+  for index,value in ipairs(redmess) do
+    drawBlock(listMailPart.xMin,yBlockStart[key],value[1],value[2])
   end
   repeat
     local eventName, arg1, arg2, _, _, message = event.pull("key_down")
@@ -187,7 +189,7 @@ function messageEnvoi()
   local recipient = io.read()
   print("Quel est le message ?")
   local messageEnvoi = io.read()
-  sendToServer("mailSendingService",{recipient = recipient,accountId = accountId,message = messageEnvoi})
+  sendToServer("mailSendingService",{from = accountId,to = recipient,message = messageEnvoi})
   local event, _, _, _, _, protocol, isRecieved = event.pull("modem_message")
   if protocol == "mailSendingService" and isRecieved == true then
     print("Ok,message envoye !")
@@ -251,6 +253,7 @@ repeat
   if protocol == "getServerAddress" then
     serverAddress = remoteAddress
   end
+  os.sleep(1)
   try = try - 1
 until serverAddress ~= nil or try == 0
 
