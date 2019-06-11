@@ -18,9 +18,9 @@ end
 
 -- declaration var
 local version = "6.0"
-local accountId = ""
+local accountID = ""
 local password = ""
-local redmess = {}
+local messages = {}
 local xRes, yRes = gpu.getViewport()
 local listMailPart = {["xMin"] = 3, ["yMin"] = 9, ["xMax"] = 32, ["yMax"] = yRes - 3}
 local editMailPart = {["xMin"] = 36, ["yMin"] = 5, ["xMax"] = xRes - 3, ["yMax"] = yRes - 3}
@@ -57,6 +57,10 @@ function initInterface()
   --top screen bar
   gpu.setBackground(0x666666)
   gpu.fill(1, 1, xRes, 3, " ")
+  term.setCursor(3, 2)
+  term.write("CraftMail - Version: " .. version)
+  term.setCursor(xRes-7-string.len( accountID )-string.len( "Logged as: " ),2)
+  term.write("Logged as: "..accountID)
 
   gpu.setBackground(0xFF0000)
   gpu.fill(xRes - 4, 1, 5, 3, " ")
@@ -87,8 +91,8 @@ function drawBlock(x, y, sender, object)
   end
 end
 
-function sendToServer(protocol,dataTable)
-  modem.send(serverAddress, 32728, protocol,serialization.serialize(dataTable))
+function sendToServer(protocol, dataTable)
+  modem.send(serverAddress, 32728, protocol, serialization.serialize(dataTable))
 end
 
 function login()
@@ -97,40 +101,34 @@ function login()
   io.write("Login")
   term.setCursor(4, 4)
   io.write("ID : ")
-  accountId = io.read()
+  accountID = io.read()
   term.setCursor(4, 8)
   io.write("Password : ")
   password = io.read()
-  sendToServer("userLogon",{accountId = accountId, password = password})
+  sendToServer("userLogon", {accountID = accountID, password = password})
   eventName, a, b, c, d, protocol, isSucessfull = event.pull("modem_message")
   return isSucessfull
 end
 
 function getMailFromServer()
-  sendToServer("mailRequestService",{accountId = accountId})
+  sendToServer("mailRequestService", {accountID = accountID})
   local try = 5
   repeat
     eventName, _, _, _, _, protocol, data = event.pull("modem_message") --localAddress,remoteAddress,port,distance
     if protocol == "mailRequestService" then
       message = serialization.unserialize(data)
     end
-    try = try -1
+    try = try - 1
   until #message ~= 0 or try == 0
   return message
 end
 
 --Menu
 function menu()
-  --writeMid("CraftMail by BioXtech v"..version,2)
-  --[[gpu.setBackground(0x0000FF)
-    writeMid(" [N]ouveau message",3)
-    writeMid(" [R]eception messages",5)
-    writeMid(" [C]arnet d'adresses",7)
-    writeMid(" [Q]uitter",9)--]]
   initInterface()
-  redmess = getMailFromServer()
-  for index,value in ipairs(redmess) do
-    drawBlock(listMailPart.xMin,yBlockStart[key],value[1],value[2])
+  messages = getMailFromServer()
+  for i = 1, #messages do
+    drawBlock(listMailPart.xMin, yBlockStart[i], messages[i]["from"], messages[i]["message"])
   end
   repeat
     local eventName, arg1, arg2, _, _, message = event.pull("key_down")
@@ -189,7 +187,7 @@ function messageEnvoi()
   local recipient = io.read()
   print("Quel est le message ?")
   local messageEnvoi = io.read()
-  sendToServer("mailSendingService",{from = accountId,to = recipient,message = messageEnvoi})
+  sendToServer("mailSendingService", {from = accountID, to = recipient, message = messageEnvoi})
   local event, _, _, _, _, protocol, isRecieved = event.pull("modem_message")
   if protocol == "mailSendingService" and isRecieved == true then
     print("Ok,message envoye !")
@@ -203,7 +201,7 @@ end
 
 --reception message
 function messageRecep()
-  redmess = getMailFromServer()
+  messages = getMailFromServer()
   term.clear()
   term.setCursor(14, 1)
   io.write("Messages")
@@ -212,10 +210,10 @@ function messageRecep()
   print(" ")
   print("Messages :")
   for i = 1, 10 do
-    if redmess[i] == nil then
+    if messages[i] == nil then
       print("")
     else
-      print(redmess[i])
+      print(messages[i])
     end
   end
   repeat
@@ -223,7 +221,7 @@ function messageRecep()
     if eventName == "key_down" and arg2 == 113 then
       menu()
     --[[elseif eventName == "modem_message" then
-        table.insert(redmess,data)
+        table.insert(messages,data)
         print(data)]]
     end
   until (arg2 == 113)
